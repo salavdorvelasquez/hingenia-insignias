@@ -55,8 +55,8 @@ class HI_Generator {
 		$sx = $w / $cw;
 		$sy = $h / $ch;
 
-		// Nombre.
-		if ( ! empty( $layout['name'] ) ) {
+		// Nombre (solo si está activado en la plantilla).
+		if ( ! empty( $layout['name'] ) && ! empty( $layout['name']['enabled'] ) ) {
 			self::draw_name( $im, $layout['name'], $student_name, $sx, $sy );
 		}
 

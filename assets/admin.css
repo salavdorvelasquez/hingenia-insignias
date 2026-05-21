@@ -23,6 +23,9 @@ body.hi-app .wrap { margin: 0; padding: 0; }
 /* SVG defaults */
 .hi-ico { display: inline-block; flex-shrink: 0; vertical-align: middle; }
 
+/* El atributo [hidden] debe ganar a cualquier display de clase. */
+body.hi-app [hidden] { display: none !important; }
+
 /* ============================================================
    Layout: shell con sidebar + main
    ============================================================ */

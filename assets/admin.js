@@ -87,6 +87,8 @@
 		EL.save      = document.getElementById( 'hi-ed-save' );
 		EL.status    = document.getElementById( 'hi-ed-status' );
 		// controls
+		EL.nEnab   = document.getElementById( 'hi-name-enabled' );
+		EL.nOffHint = document.getElementById( 'hi-name-off-hint' );
 		EL.nSize   = document.getElementById( 'hi-name-size' );
 		EL.nSizeO  = document.getElementById( 'hi-name-size-out' );
 		EL.nColor  = document.getElementById( 'hi-name-color' );
@@ -147,10 +149,20 @@
 		var L = ed.layout;
 		placeBox( EL.boxName, L.name );
 		placeBox( EL.boxQr, L.qr );
-		EL.boxName.hidden = false;
+		EL.boxName.hidden = ! L.name.enabled;
 		EL.boxQr.hidden   = ! L.qr.enabled;
 		syncNamePreview();
 		EL.boxQrGrid.innerHTML = fakeQrSvg( L.qr.fg, L.qr.bg );
+	}
+
+	function syncNameEnabled() {
+		var on = !! ed.layout.name.enabled;
+		EL.boxName.hidden = ! on;
+		EL.nOffHint.hidden = on;
+		// Atenúa los controles del nombre cuando está desactivado.
+		[ EL.nSize, EL.nColor, EL.nAlign, EL.nWeight, EL.nFont, EL.nUpper ].forEach( function ( el ) {
+			if ( el ) { el.disabled = ! on; el.closest( '.hi-ctrl-row, .hi-ctrl-check' ).style.opacity = on ? '1' : '.45'; }
+		} );
 	}
 
 	function syncNamePreview() {
@@ -167,6 +179,7 @@
 
 	function syncControls() {
 		var L = ed.layout;
+		EL.nEnab.checked = !! L.name.enabled;
 		EL.nSize.value  = L.name.size;  EL.nSizeO.textContent = L.name.size;
 		EL.nColor.value = toHex( L.name.color, '#1e293b' );
 		EL.nAlign.value = L.name.align;
@@ -183,6 +196,7 @@
 	}
 
 	function bindControls() {
+		EL.nEnab.addEventListener( 'change', function () { ed.layout.name.enabled = this.checked; syncNameEnabled(); } );
 		EL.nSize.addEventListener( 'input', function () {
 			ed.layout.name.size = parseInt( this.value, 10 ); EL.nSizeO.textContent = this.value; syncNamePreview();
 		} );
@@ -256,6 +270,7 @@
 			EL.save.disabled = false;
 			computeScale();
 			renderBoxes();
+			syncNameEnabled();
 			if ( cb ) { cb(); }
 		};
 		im.onerror = function () { setStatus( 'No se pudo cargar la imagen.', true ); };

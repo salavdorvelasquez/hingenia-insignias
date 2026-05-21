@@ -143,7 +143,14 @@ $default_layout = wp_json_encode( HI_Data::default_layout_json() );
 				</div>
 
 				<div class="hi-ctrl-group" id="hi-ctrl-name" hidden>
-					<div class="hi-ctrl-head"><span><?php echo HI_Icons::get( 'user', 14 ); ?> Nombre del estudiante</span></div>
+					<div class="hi-ctrl-head">
+						<span><?php echo HI_Icons::get( 'user', 14 ); ?> Nombre del estudiante</span>
+						<label class="hi-switch" title="Estampar el nombre en la imagen">
+							<input type="checkbox" id="hi-name-enabled">
+							<span class="hi-switch__track"></span>
+						</label>
+					</div>
+					<p class="hi-help-text" id="hi-name-off-hint" hidden>El nombre no se estampará. Solo se generará el QR. (El nombre del curso ya viene en tu imagen.)</p>
 					<label class="hi-ctrl-row">
 						<span>Tamaño</span>
 						<input type="range" id="hi-name-size" min="12" max="160" step="1">

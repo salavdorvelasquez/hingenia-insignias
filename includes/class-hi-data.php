@@ -128,6 +128,7 @@ class HI_Data {
 				'x' => 100, 'y' => 690, 'w' => 880, 'h' => 110,
 				'align' => 'center', 'size' => 46, 'color' => '#1e293b',
 				'weight' => 700, 'uppercase' => true, 'font' => 'sans',
+				'enabled' => false, // por defecto solo QR; el curso ya viene en la imagen.
 			),
 			'qr' => array(
 				'x' => 80, 'y' => 80, 'w' => 170, 'h' => 170,

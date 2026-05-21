@@ -343,6 +343,7 @@ class HI_Admin {
 				'weight'    => in_array( (int) ( $l['name']['weight'] ?? 700 ), array( 400, 600, 700, 800 ), true ) ? (int) $l['name']['weight'] : 700,
 				'uppercase' => ! empty( $l['name']['uppercase'] ),
 				'font'      => in_array( $l['name']['font'] ?? '', array( 'sans', 'serif' ), true ) ? $l['name']['font'] : 'sans',
+				'enabled'   => ! empty( $l['name']['enabled'] ),
 			),
 			'qr'       => array(
 				'x'      => (int) ( $l['qr']['x'] ?? $d['qr']['x'] ),
