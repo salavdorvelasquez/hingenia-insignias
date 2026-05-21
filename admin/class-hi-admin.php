@@ -31,6 +31,10 @@ class HI_Admin {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'admin_body_class', array( $this, 'maybe_body_class' ) );
+
+		// AJAX (admin).
+		add_action( 'wp_ajax_hi_save_template',   array( $this, 'ajax_save_template' ) );
+		add_action( 'wp_ajax_hi_delete_template', array( $this, 'ajax_delete_template' ) );
 	}
 
 	public function add_menu() {
@@ -77,6 +81,8 @@ class HI_Admin {
 		if ( ! in_array( $hook, self::$screens, true ) ) {
 			return;
 		}
+		// Necesario para el selector de medios del editor de plantillas.
+		wp_enqueue_media();
 		// Cache buster por filemtime: cualquier cambio en el archivo invalida el cache del browser,
 		// incluso si no bumpeamos HI_VERSION. Más robusto contra opcache / CDN / LiteSpeed.
 		$css_ver = @filemtime( HI_DIR . 'assets/admin.css' ) ?: HI_VERSION;
@@ -181,5 +187,104 @@ class HI_Admin {
 		$this->shell_open( 'settings' );
 		require HI_DIR . 'admin/views/settings.php';
 		$this->shell_close();
+	}
+
+	/* ====================================================================
+	   AJAX
+	   ==================================================================== */
+
+	private function check_ajax() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'msg' => 'Sin permisos.' ), 403 );
+		}
+		check_ajax_referer( 'hi_admin', 'nonce' );
+	}
+
+	/** Guarda (crea o actualiza) la plantilla de un curso. */
+	public function ajax_save_template() {
+		$this->check_ajax();
+
+		$course_id = isset( $_POST['course_id'] ) ? (int) $_POST['course_id'] : 0;
+		if ( ! $course_id ) {
+			wp_send_json_error( array( 'msg' => 'Falta el curso.' ) );
+		}
+
+		$png_id  = isset( $_POST['png_attachment_id'] ) ? (int) $_POST['png_attachment_id'] : 0;
+		$png_url = isset( $_POST['png_url'] ) ? esc_url_raw( wp_unslash( $_POST['png_url'] ) ) : '';
+		if ( ! $png_id && ! $png_url ) {
+			wp_send_json_error( array( 'msg' => 'Sube primero la imagen base de la insignia.' ) );
+		}
+
+		$layout_raw = isset( $_POST['layout_json'] ) ? wp_unslash( $_POST['layout_json'] ) : '';
+		$layout     = json_decode( $layout_raw, true );
+		if ( ! is_array( $layout ) ) {
+			$layout = HI_Data::default_layout_json();
+		}
+		$layout = $this->sanitize_layout( $layout );
+
+		$nombre = isset( $_POST['nombre'] ) ? sanitize_text_field( wp_unslash( $_POST['nombre'] ) ) : '';
+		if ( '' === $nombre ) {
+			$nombre = HI_Data::get_course_title( $course_id );
+		}
+
+		$existing = HI_Data::get_template_by_course( $course_id );
+		$tpl_id   = $existing ? (int) $existing->id : 0;
+
+		$id = HI_Data::save_template( array(
+			'course_id'         => $course_id,
+			'course_title'      => HI_Data::get_course_title( $course_id ),
+			'nombre'            => $nombre,
+			'png_attachment_id' => $png_id,
+			'png_url'           => $png_url,
+			'layout_json'       => $layout,
+			'activa'            => 1,
+		), $tpl_id );
+
+		wp_send_json_success( array(
+			'id'      => $id,
+			'msg'     => $existing ? 'Plantilla actualizada.' : 'Plantilla creada.',
+			'png_url' => $png_url,
+		) );
+	}
+
+	public function ajax_delete_template() {
+		$this->check_ajax();
+		$id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+		if ( $id ) {
+			HI_Data::delete_template( $id );
+		}
+		wp_send_json_success( array( 'msg' => 'Plantilla eliminada.' ) );
+	}
+
+	/** Normaliza el layout recibido del editor a tipos/rangos seguros. */
+	private function sanitize_layout( $l ) {
+		$d = HI_Data::default_layout_json();
+		$out = array(
+			'canvas_w' => max( 1, (int) ( $l['canvas_w'] ?? $d['canvas_w'] ) ),
+			'canvas_h' => max( 1, (int) ( $l['canvas_h'] ?? $d['canvas_h'] ) ),
+			'name'     => array(
+				'x'         => (int) ( $l['name']['x'] ?? $d['name']['x'] ),
+				'y'         => (int) ( $l['name']['y'] ?? $d['name']['y'] ),
+				'w'         => max( 1, (int) ( $l['name']['w'] ?? $d['name']['w'] ) ),
+				'h'         => max( 1, (int) ( $l['name']['h'] ?? $d['name']['h'] ) ),
+				'align'     => in_array( $l['name']['align'] ?? '', array( 'left', 'center', 'right' ), true ) ? $l['name']['align'] : 'center',
+				'size'      => max( 6, min( 400, (int) ( $l['name']['size'] ?? $d['name']['size'] ) ) ),
+				'color'     => sanitize_hex_color( $l['name']['color'] ?? '' ) ?: $d['name']['color'],
+				'weight'    => in_array( (int) ( $l['name']['weight'] ?? 700 ), array( 400, 600, 700, 800 ), true ) ? (int) $l['name']['weight'] : 700,
+				'uppercase' => ! empty( $l['name']['uppercase'] ),
+				'font'      => in_array( $l['name']['font'] ?? '', array( 'sans', 'serif' ), true ) ? $l['name']['font'] : 'sans',
+			),
+			'qr'       => array(
+				'x'      => (int) ( $l['qr']['x'] ?? $d['qr']['x'] ),
+				'y'      => (int) ( $l['qr']['y'] ?? $d['qr']['y'] ),
+				'w'      => max( 1, (int) ( $l['qr']['w'] ?? $d['qr']['w'] ) ),
+				'h'      => max( 1, (int) ( $l['qr']['h'] ?? $d['qr']['h'] ) ),
+				'fg'     => sanitize_hex_color( $l['qr']['fg'] ?? '' ) ?: '#000000',
+				'bg'     => sanitize_hex_color( $l['qr']['bg'] ?? '' ) ?: '#ffffff',
+				'margin' => max( 0, min( 64, (int) ( $l['qr']['margin'] ?? 8 ) ) ),
+				'enabled'=> ! isset( $l['qr']['enabled'] ) || ! empty( $l['qr']['enabled'] ),
+			),
+		);
+		return $out;
 	}
 }
