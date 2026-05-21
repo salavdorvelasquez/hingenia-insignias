@@ -82,6 +82,12 @@
 		EL.imgMeta   = document.getElementById( 'hi-ed-imgmeta' );
 		EL.ctrlName  = document.getElementById( 'hi-ctrl-name' );
 		EL.ctrlQr    = document.getElementById( 'hi-ctrl-qr' );
+		EL.ctrlMeta  = document.getElementById( 'hi-ctrl-meta' );
+		EL.mNivel    = document.getElementById( 'hi-meta-nivel' );
+		EL.mDesc     = document.getElementById( 'hi-meta-desc' );
+		EL.mSkills   = document.getElementById( 'hi-meta-skills' );
+		EL.mCriterios = document.getElementById( 'hi-meta-criterios' );
+		EL.mHoras    = document.getElementById( 'hi-meta-horas' );
 		EL.upload    = document.getElementById( 'hi-ed-upload' );
 		EL.change    = document.getElementById( 'hi-ed-change' );
 		EL.save      = document.getElementById( 'hi-ed-save' );
@@ -266,7 +272,7 @@
 			EL.drop.hidden = true;
 			EL.change.hidden = false;
 			EL.imgMeta.textContent = ed.natW + ' × ' + ed.natH + ' px';
-			EL.ctrlName.hidden = false; EL.ctrlQr.hidden = false;
+			EL.ctrlName.hidden = false; EL.ctrlQr.hidden = false; EL.ctrlMeta.hidden = false;
 			EL.save.disabled = false;
 			computeScale();
 			renderBoxes();
@@ -305,6 +311,14 @@
 		try { ed.layout = JSON.parse( data.layout ); } catch ( e ) { ed.layout = defaultLayout(); }
 		if ( ! ed.layout ) { ed.layout = defaultLayout(); }
 
+		var meta = {};
+		try { meta = JSON.parse( data.meta || '{}' ); } catch ( e ) { meta = {}; }
+		EL.mNivel.value     = meta.nivel || '';
+		EL.mDesc.value      = meta.descripcion || '';
+		EL.mSkills.value    = ( meta.skills || [] ).join( ', ' );
+		EL.mCriterios.value = ( meta.criterios || [] ).join( '\n' );
+		EL.mHoras.value     = meta.horas || '';
+
 		EL.course.textContent = ed.courseTitle;
 		setStatus( '' );
 		EL.save.disabled = true;
@@ -315,6 +329,7 @@
 		EL.drop.hidden = false;
 		EL.ctrlName.hidden = true;
 		EL.ctrlQr.hidden = true;
+		EL.ctrlMeta.hidden = true;
 		EL.imgMeta.textContent = 'Ninguna imagen aún.';
 
 		EL.modal.hidden = false;
@@ -342,12 +357,20 @@
 		ed.layout.canvas_h = ed.natH;
 		EL.save.disabled = true;
 		setStatus( 'Guardando…' );
+		var meta = {
+			nivel: EL.mNivel.value.trim(),
+			descripcion: EL.mDesc.value.trim(),
+			skills: EL.mSkills.value,
+			criterios: EL.mCriterios.value,
+			horas: parseInt( EL.mHoras.value, 10 ) || 0
+		};
 		ajax( 'hi_save_template', {
 			course_id: ed.courseId,
 			nombre: ed.courseTitle,
 			png_attachment_id: ed.pngId,
 			png_url: ed.pngUrl,
-			layout_json: JSON.stringify( ed.layout )
+			layout_json: JSON.stringify( ed.layout ),
+			meta_json: JSON.stringify( meta )
 		} ).done( function ( res ) {
 			if ( res && res.success ) {
 				setStatus( 'Guardado ✓' );

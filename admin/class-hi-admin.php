@@ -39,6 +39,40 @@ class HI_Admin {
 		add_action( 'wp_ajax_hi_emit_batch',      array( $this, 'ajax_emit_batch' ) );
 		add_action( 'wp_ajax_hi_revoke_cert',     array( $this, 'ajax_revoke_cert' ) );
 		add_action( 'wp_ajax_hi_course_students', array( $this, 'ajax_course_students' ) );
+		add_action( 'admin_post_hi_save_settings', array( $this, 'save_settings_form' ) );
+	}
+
+	public function save_settings_form() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sin permisos.', 'hingenia-insignias' ) );
+		}
+		check_admin_referer( 'hi_settings' );
+
+		$raw  = wp_unslash( $_POST['s'] ?? array() );
+		$prev = HI_Data::get_settings();
+		$clean = array(
+			'public_slug'     => sanitize_title( $raw['public_slug'] ?? $prev['public_slug'] ) ?: 'insignias',
+			'badge_slug'      => sanitize_title( $raw['badge_slug'] ?? $prev['badge_slug'] ) ?: 'insignia',
+			'org_name'        => sanitize_text_field( $raw['org_name'] ?? $prev['org_name'] ),
+			'org_url'         => esc_url_raw( $raw['org_url'] ?? $prev['org_url'] ),
+			'atc_enabled'     => ! empty( $raw['atc_enabled'] ) ? '1' : '',
+			'atc_partner'     => sanitize_text_field( $raw['atc_partner'] ?? '' ),
+			'atc_label'       => sanitize_text_field( $raw['atc_label'] ?? '' ),
+			'atc_note'        => sanitize_textarea_field( $raw['atc_note'] ?? '' ),
+			'profile_tagline' => sanitize_text_field( $raw['profile_tagline'] ?? '' ),
+			'profile_desc'    => sanitize_textarea_field( $raw['profile_desc'] ?? '' ),
+			'show_why'        => ! empty( $raw['show_why'] ) ? '1' : '',
+		);
+		HI_Data::save_settings( $clean );
+
+		// Si cambiaron los slugs, refrescar rewrite rules.
+		if ( $clean['public_slug'] !== $prev['public_slug'] || $clean['badge_slug'] !== $prev['badge_slug'] ) {
+			HI_Public::register_rewrite_rules();
+			flush_rewrite_rules();
+		}
+
+		wp_safe_redirect( add_query_arg( 'updated', '1', admin_url( 'admin.php?page=' . self::MENU_SLUG . '-settings' ) ) );
+		exit;
 	}
 
 	public function add_menu() {
@@ -231,6 +265,18 @@ class HI_Admin {
 			$nombre = HI_Data::get_course_title( $course_id );
 		}
 
+		$meta_raw = isset( $_POST['meta_json'] ) ? json_decode( wp_unslash( $_POST['meta_json'] ), true ) : array();
+		if ( ! is_array( $meta_raw ) ) {
+			$meta_raw = array();
+		}
+		$meta = array(
+			'nivel'       => sanitize_text_field( $meta_raw['nivel'] ?? '' ),
+			'descripcion' => sanitize_textarea_field( $meta_raw['descripcion'] ?? '' ),
+			'skills'      => array_values( array_filter( array_map( 'sanitize_text_field', array_map( 'trim', explode( ',', (string) ( $meta_raw['skills'] ?? '' ) ) ) ) ) ),
+			'criterios'   => array_values( array_filter( array_map( 'sanitize_text_field', array_map( 'trim', preg_split( '/\r\n|\r|\n/', (string) ( $meta_raw['criterios'] ?? '' ) ) ) ) ) ),
+			'horas'       => max( 0, (int) ( $meta_raw['horas'] ?? 0 ) ),
+		);
+
 		$existing = HI_Data::get_template_by_course( $course_id );
 		$tpl_id   = $existing ? (int) $existing->id : 0;
 
@@ -241,6 +287,7 @@ class HI_Admin {
 			'png_attachment_id' => $png_id,
 			'png_url'           => $png_url,
 			'layout_json'       => $layout,
+			'meta_json'         => $meta,
 			'activa'            => 1,
 		), $tpl_id );
 

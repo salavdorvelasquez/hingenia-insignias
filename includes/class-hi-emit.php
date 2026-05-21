@@ -79,6 +79,9 @@ class HI_Emit {
 
 		HI_Data::update_certificate( $cert['id'], array( 'png_url' => $gen['url'] ) );
 
+		// QR standalone para la lupa (no crítico si falla).
+		HI_Generator::generate_qr_png( $token, $verify );
+
 		return array(
 			'success' => true,
 			'id'      => (int) $cert['id'],

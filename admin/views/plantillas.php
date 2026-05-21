@@ -53,6 +53,7 @@ $default_layout = wp_json_encode( HI_Data::default_layout_json() );
 			$has       = ! empty( $tpl );
 			$png       = $has ? $tpl->png_url : '';
 			$layout    = $has && $tpl->layout_json ? $tpl->layout_json : $default_layout;
+			$meta_json = wp_json_encode( $has ? HI_Data::template_meta( $tpl ) : HI_Data::default_meta() );
 			$state     = $has ? 'con' : 'sin';
 			?>
 			<article class="hi-tpl-card" data-state="<?php echo esc_attr( $state ); ?>" data-title="<?php echo esc_attr( strtolower( $r['title'] ) ); ?>">
@@ -77,6 +78,7 @@ $default_layout = wp_json_encode( HI_Data::default_layout_json() );
 							data-png-url="<?php echo esc_attr( $png ); ?>"
 							data-png-id="<?php echo $has ? (int) $tpl->png_attachment_id : 0; ?>"
 							data-layout="<?php echo esc_attr( $layout ); ?>"
+							data-meta="<?php echo esc_attr( $meta_json ); ?>"
 						>
 							<?php echo $has ? HI_Icons::get( 'settings', 14 ) . ' Editar' : HI_Icons::get( 'plus', 14 ) . ' Crear'; ?>
 						</button>
@@ -207,6 +209,31 @@ $default_layout = wp_json_encode( HI_Data::default_layout_json() );
 						<input type="color" id="hi-qr-bg" value="#ffffff">
 					</label>
 					<p class="hi-help-text">Arrastra la caja QR en el lienzo para moverla y usa la esquina para cambiar el tamaño.</p>
+				</div>
+
+				<div class="hi-ctrl-group" id="hi-ctrl-meta" hidden>
+					<div class="hi-ctrl-head"><span><?php echo HI_Icons::get( 'award', 14 ); ?> Detalles de la credencial</span></div>
+					<p class="hi-help-text" style="margin-bottom:10px">Se muestran en la página pública de verificación.</p>
+					<div class="hi-field">
+						<label>Nivel</label>
+						<input type="text" id="hi-meta-nivel" placeholder="Ej. Especialización profesional">
+					</div>
+					<div class="hi-field">
+						<label>Acerca de esta insignia</label>
+						<textarea id="hi-meta-desc" rows="3" placeholder="Qué acredita esta credencial…"></textarea>
+					</div>
+					<div class="hi-field">
+						<label>Competencias (separadas por coma)</label>
+						<input type="text" id="hi-meta-skills" placeholder="Revit, Modelado BIM, Coordinación">
+					</div>
+					<div class="hi-field">
+						<label>Criterios de obtención (uno por línea)</label>
+						<textarea id="hi-meta-criterios" rows="3" placeholder="Completó el 100% del programa&#10;Aprobó las evaluaciones&#10;Entregó el proyecto final"></textarea>
+					</div>
+					<div class="hi-field">
+						<label>Horas certificadas (opcional)</label>
+						<input type="number" id="hi-meta-horas" min="0" placeholder="0">
+					</div>
 				</div>
 			</aside>
 		</div>

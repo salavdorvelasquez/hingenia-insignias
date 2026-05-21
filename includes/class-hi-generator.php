@@ -223,12 +223,54 @@ class HI_Generator {
 		return array( 'success' => true, 'url' => $url, 'path' => $file );
 	}
 
-	/** Borra el PNG físico de una emisión. */
+	/** Borra el PNG físico de una emisión (insignia + QR standalone). */
 	public static function delete_png( $token ) {
 		$up   = wp_upload_dir();
-		$file = trailingslashit( $up['basedir'] ) . self::SUBDIR . '/badge-' . sanitize_file_name( $token ) . '.png';
-		if ( file_exists( $file ) ) {
-			@unlink( $file );
+		$base = trailingslashit( $up['basedir'] ) . self::SUBDIR . '/';
+		foreach ( array( 'badge-', 'qr-' ) as $pre ) {
+			$f = $base . $pre . sanitize_file_name( $token ) . '.png';
+			if ( file_exists( $f ) ) {
+				@unlink( $f );
+			}
 		}
+	}
+
+	/* ================================================================
+	   QR standalone (para la lupa / ampliación)
+	   ================================================================ */
+
+	public static function qr_png_url( $token ) {
+		$up = wp_upload_dir();
+		return trailingslashit( $up['baseurl'] ) . self::SUBDIR . '/qr-' . sanitize_file_name( $token ) . '.png';
+	}
+
+	/** Genera el PNG del QR aislado (grande y nítido). Devuelve URL o ''. */
+	public static function generate_qr_png( $token, $url, $size = 720 ) {
+		if ( ! self::gd_ready() ) {
+			return '';
+		}
+		$up  = wp_upload_dir();
+		$dir = trailingslashit( $up['basedir'] ) . self::SUBDIR;
+		if ( ! file_exists( $dir ) ) {
+			wp_mkdir_p( $dir );
+		}
+		$file  = trailingslashit( $dir ) . 'qr-' . sanitize_file_name( $token ) . '.png';
+		$im    = imagecreatetruecolor( $size, $size );
+		$white = imagecolorallocate( $im, 255, 255, 255 );
+		imagefilledrectangle( $im, 0, 0, $size, $size, $white );
+		HI_QR::draw_gd( $im, $url, 0, 0, $size, array( 17, 24, 39 ), array( 255, 255, 255 ), (int) round( $size * 0.06 ), 'M' );
+		imagepng( $im, $file, 6 );
+		imagedestroy( $im );
+		return self::qr_png_url( $token );
+	}
+
+	/** Devuelve la URL del QR; lo genera si aún no existe (lazy, para emisiones viejas). */
+	public static function ensure_qr_png( $token, $url ) {
+		$up   = wp_upload_dir();
+		$file = trailingslashit( $up['basedir'] ) . self::SUBDIR . '/qr-' . sanitize_file_name( $token ) . '.png';
+		if ( file_exists( $file ) ) {
+			return self::qr_png_url( $token );
+		}
+		return self::generate_qr_png( $token, $url );
 	}
 }

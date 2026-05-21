@@ -18,7 +18,7 @@ class HI_Data {
 	const OPT_DB_VER   = 'hi_db_version';
 	const TABLE_TPL    = 'hi_badge_templates';
 	const TABLE_CERT   = 'hi_certificates';
-	const DB_VERSION   = '1';
+	const DB_VERSION   = '2';
 
 	public static function boot() {
 		add_action( 'admin_init', array( __CLASS__, 'maybe_upgrade' ) );
@@ -56,6 +56,7 @@ class HI_Data {
 			png_attachment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			png_url TEXT NULL,
 			layout_json LONGTEXT NULL,
+			meta_json LONGTEXT NULL,
 			activa TINYINT(1) NOT NULL DEFAULT 1,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NULL,
@@ -96,14 +97,19 @@ class HI_Data {
 
 	public static function default_settings() {
 		return array(
-			'public_slug'        => 'insignias',          // /insignias/{slug-usuario}
-			'badge_slug'         => 'insignia',           // /insignia/{token}
-			'org_name'           => 'Hingenia',
-			'org_url'            => home_url( '/' ),
-			'qr_destination'     => 'badge',              // 'badge' (recomendado) | 'profile'
-			'verify_subtitle'    => 'Verificación de insignia digital emitida por Hingenia',
-			'profile_intro'      => 'Estas son las insignias digitales que ha obtenido el estudiante.',
-			'allow_share_linkedin' => '1',
+			'public_slug'    => 'insignias',          // /insignias/{slug-usuario}
+			'badge_slug'     => 'insignia',           // /insignia/{token}
+			'org_name'       => 'Hingenia',
+			'org_url'        => home_url( '/' ),
+			// Banda de partner / Centro Autorizado.
+			'atc_enabled'    => '1',
+			'atc_partner'    => 'Autodesk',
+			'atc_label'      => 'Authorized Training Center',
+			'atc_note'       => 'Hingenia es Centro Autorizado de Entrenamiento Autodesk. Escanea el QR de la insignia o usa el ID para validar esta credencial — reconocimiento internacional.',
+			// Perfil del estudiante.
+			'profile_tagline' => 'perfil verificado por Hingenia',
+			'profile_desc'    => 'Profesional certificado en tecnologías AEC (Arquitectura, Ingeniería y Construcción). Estas credenciales digitales acreditan competencias reales, son verificables en línea y cuentan con respaldo internacional.',
+			'show_why'        => '1',
 		);
 	}
 
@@ -195,10 +201,13 @@ class HI_Data {
 			'layout_json'       => is_array( $data['layout_json'] ?? null )
 				? wp_json_encode( $data['layout_json'] )
 				: (string) ( $data['layout_json'] ?? wp_json_encode( self::default_layout_json() ) ),
+			'meta_json'         => is_array( $data['meta_json'] ?? null )
+				? wp_json_encode( $data['meta_json'] )
+				: (string) ( $data['meta_json'] ?? '' ),
 			'activa'            => ! empty( $data['activa'] ) ? 1 : 0,
 			'updated_at'        => $now,
 		);
-		$formats = array( '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s' );
+		$formats = array( '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s' );
 
 		if ( $id ) {
 			$wpdb->update( self::table_templates(), $row, array( 'id' => (int) $id ), $formats, array( '%d' ) );
@@ -213,6 +222,30 @@ class HI_Data {
 	public static function delete_template( $id ) {
 		global $wpdb;
 		$wpdb->delete( self::table_templates(), array( 'id' => (int) $id ), array( '%d' ) );
+	}
+
+	/** Metadatos de la credencial (nivel, descripción, skills, criterios, horas). */
+	public static function default_meta() {
+		return array(
+			'nivel'       => '',
+			'descripcion' => '',
+			'skills'      => array(),
+			'criterios'   => array(),
+			'horas'       => 0,
+		);
+	}
+
+	public static function template_meta( $tpl ) {
+		$raw = is_object( $tpl ) ? ( $tpl->meta_json ?? '' ) : ( is_string( $tpl ) ? $tpl : '' );
+		$m   = json_decode( (string) $raw, true );
+		if ( ! is_array( $m ) ) {
+			$m = array();
+		}
+		$m = wp_parse_args( $m, self::default_meta() );
+		$m['skills']    = array_values( (array) $m['skills'] );
+		$m['criterios'] = array_values( (array) $m['criterios'] );
+		$m['horas']     = (int) $m['horas'];
+		return $m;
 	}
 
 	public static function count_templates( $activa = null ) {
