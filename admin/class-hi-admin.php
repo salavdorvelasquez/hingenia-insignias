@@ -38,6 +38,7 @@ class HI_Admin {
 		add_action( 'wp_ajax_hi_emit_single',     array( $this, 'ajax_emit_single' ) );
 		add_action( 'wp_ajax_hi_emit_batch',      array( $this, 'ajax_emit_batch' ) );
 		add_action( 'wp_ajax_hi_revoke_cert',     array( $this, 'ajax_revoke_cert' ) );
+		add_action( 'wp_ajax_hi_course_students', array( $this, 'ajax_course_students' ) );
 	}
 
 	public function add_menu() {
@@ -311,6 +312,18 @@ class HI_Admin {
 			HI_Emit::revoke( $id );
 		}
 		wp_send_json_success( array( 'msg' => 'Insignia revocada.' ) );
+	}
+
+	/** Devuelve los estudiantes matriculados de un curso para el selector de emisión. */
+	public function ajax_course_students() {
+		$this->check_ajax();
+		$course_id = isset( $_POST['course_id'] ) ? (int) $_POST['course_id'] : 0;
+		if ( ! $course_id ) {
+			wp_send_json_error( array( 'msg' => 'Falta el curso.' ) );
+		}
+		wp_send_json_success( array(
+			'students' => HI_Data::get_course_students( $course_id ),
+		) );
 	}
 
 	/** Normaliza el layout recibido del editor a tipos/rangos seguros. */

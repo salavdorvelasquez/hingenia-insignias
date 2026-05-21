@@ -404,6 +404,59 @@ class HI_Data {
 		return $t ? $t : '';
 	}
 
+	/**
+	 * Estudiantes matriculados en un curso de Tutor LMS.
+	 *
+	 * Tutor guarda la matrícula como CPT 'tutor_enrolled':
+	 * post_parent = curso, post_author = usuario, post_status = 'completed' (activa).
+	 *
+	 * @return array Lista de [ user_id, name, email, has ] (has = ya tiene insignia).
+	 */
+	public static function get_course_students( $course_id ) {
+		global $wpdb;
+		$course_id = (int) $course_id;
+
+		$ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT DISTINCT post_author FROM {$wpdb->posts}
+			 WHERE post_type = 'tutor_enrolled' AND post_parent = %d AND post_status = 'completed'",
+			$course_id
+		) );
+
+		$out = array();
+		foreach ( $ids as $uid ) {
+			$u = get_userdata( (int) $uid );
+			if ( ! $u ) {
+				continue;
+			}
+			$name = trim( (string) $u->display_name );
+			if ( '' === $name ) {
+				$name = trim( $u->first_name . ' ' . $u->last_name );
+			}
+			if ( '' === $name ) {
+				$name = $u->user_login;
+			}
+			$existing = self::find_existing_certificate( (int) $u->ID, $u->user_email, $course_id );
+			$out[]    = array(
+				'user_id' => (int) $u->ID,
+				'name'    => $name,
+				'email'   => $u->user_email,
+				'has'     => $existing ? true : false,
+			);
+		}
+		usort( $out, function ( $a, $b ) { return strcasecmp( $a['name'], $b['name'] ); } );
+		return $out;
+	}
+
+	/** Nº de estudiantes matriculados activos en un curso. */
+	public static function count_course_students( $course_id ) {
+		global $wpdb;
+		return (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(DISTINCT post_author) FROM {$wpdb->posts}
+			 WHERE post_type = 'tutor_enrolled' AND post_parent = %d AND post_status = 'completed'",
+			(int) $course_id
+		) );
+	}
+
 	/* ====================================================================
 	   URLs públicas
 	   ==================================================================== */

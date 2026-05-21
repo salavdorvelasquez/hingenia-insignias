@@ -439,34 +439,144 @@
 			} );
 		}
 
-		// Modal emitir individual
+		// Modal emitir: lista de matriculados
 		var modal = document.getElementById( 'hi-emit-modal' );
 		if ( ! modal ) { return; }
-		var openBtn = document.getElementById( 'hi-emit-open' );
-		var go      = document.getElementById( 'hi-emit-go' );
-		var status  = document.getElementById( 'hi-emit-status' );
+		var openBtn   = document.getElementById( 'hi-emit-open' );
+		var courseSel2 = document.getElementById( 'hi-emit-course' );
+		var listEl    = document.getElementById( 'hi-emit-list' );
+		var searchEl  = document.getElementById( 'hi-emit-search' );
+		var allChk    = document.getElementById( 'hi-emit-all' );
+		var reissueChk = document.getElementById( 'hi-emit-reissue' );
+		var countEl   = document.getElementById( 'hi-emit-count' );
+		var go        = document.getElementById( 'hi-emit-go' );
+		var status    = document.getElementById( 'hi-emit-status' );
+		var progress  = document.getElementById( 'hi-emit-progress' );
+		var bar       = document.getElementById( 'hi-emit-bar' );
+		var progressTxt = document.getElementById( 'hi-emit-progress-txt' );
+		var manualToggle = document.getElementById( 'hi-emit-manual-toggle' );
+		var manualForm   = document.getElementById( 'hi-emit-manual-form' );
+		var mName  = document.getElementById( 'hi-emit-mname' );
+		var mEmail = document.getElementById( 'hi-emit-memail' );
+		var mAdd   = document.getElementById( 'hi-emit-madd' );
+		var students = [];   // {user_id,name,email,has,manual?}
 
-		function open() { modal.hidden = false; document.body.classList.add( 'hi-modal-open' ); document.getElementById( 'hi-emit-name' ).focus(); }
-		function close() { modal.hidden = true; document.body.classList.remove( 'hi-modal-open' ); status.textContent = ''; }
-
+		function open() {
+			modal.hidden = false; document.body.classList.add( 'hi-modal-open' );
+			status.textContent = ''; progress.hidden = true; bar.style.width = '0%';
+			loadStudents();
+		}
+		function close() { modal.hidden = true; document.body.classList.remove( 'hi-modal-open' ); }
 		if ( openBtn ) { openBtn.addEventListener( 'click', open ); }
 		modal.querySelectorAll( '[data-close]' ).forEach( function ( b ) { b.addEventListener( 'click', close ); } );
 
-		go.addEventListener( 'click', function () {
-			var course = document.getElementById( 'hi-emit-course' ).value;
-			var name   = document.getElementById( 'hi-emit-name' ).value.trim();
-			var email  = document.getElementById( 'hi-emit-email' ).value.trim();
-			if ( ! name ) { status.textContent = 'Escribe el nombre.'; status.className = 'hi-editor__status is-error'; return; }
-			go.disabled = true; status.textContent = 'Emitiendo…'; status.className = 'hi-editor__status';
-			ajax( 'hi_emit_single', { course_id: course, name: name, email: email } ).done( function ( res ) {
+		function esc( s ) { return ( s || '' ).replace( /[&<>"']/g, function ( m ) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]; } ); }
+
+		function loadStudents() {
+			listEl.innerHTML = '<div class="hi-emit-loading">Cargando estudiantes…</div>';
+			go.disabled = true; countEl.textContent = '0';
+			ajax( 'hi_course_students', { course_id: courseSel2.value } ).done( function ( res ) {
 				if ( res && res.success ) {
-					status.textContent = 'Emitida ✓'; status.className = 'hi-editor__status is-ok';
-					setTimeout( function () { window.location.reload(); }, 700 );
+					students = res.data.students || [];
+					render();
 				} else {
-					status.textContent = ( res && res.data && res.data.msg ) || 'Error.'; status.className = 'hi-editor__status is-error';
-					go.disabled = false;
+					listEl.innerHTML = '<div class="hi-emit-loading">No se pudieron cargar.</div>';
 				}
-			} ).fail( function () { status.textContent = 'Error de red.'; status.className = 'hi-editor__status is-error'; go.disabled = false; } );
+			} ).fail( function () { listEl.innerHTML = '<div class="hi-emit-loading">Error de red.</div>'; } );
+		}
+
+		function render() {
+			if ( ! students.length ) {
+				listEl.innerHTML = '<div class="hi-emit-loading">Este curso no tiene estudiantes matriculados.</div>';
+				updateCount(); return;
+			}
+			var html = '';
+			students.forEach( function ( s, i ) {
+				var tag = s.has ? '<span class="hi-tag hi-tag--skip">ya tiene</span>' : '<span class="hi-tag hi-tag--ok">pendiente</span>';
+				var checked = s.has ? '' : 'checked';
+				var dis = ( s.has && ! reissueChk.checked ) ? 'disabled' : '';
+				html += '<label class="hi-emit-row" data-i="' + i + '" data-search="' + esc( ( s.name + ' ' + ( s.email || '' ) ).toLowerCase() ) + '">'
+					+ '<input type="checkbox" class="hi-emit-cb" ' + checked + ' ' + dis + '>'
+					+ '<span class="hi-emit-row__ava">' + esc( ( s.name || '·' ).charAt(0).toUpperCase() ) + '</span>'
+					+ '<span class="hi-emit-row__info"><span class="hi-emit-row__name">' + esc( s.name ) + ( s.manual ? ' <em>(manual)</em>' : '' ) + '</span>'
+					+ '<span class="hi-emit-row__mail">' + esc( s.email || 'sin correo' ) + '</span></span>'
+					+ tag + '</label>';
+			} );
+			listEl.innerHTML = html;
+			listEl.querySelectorAll( '.hi-emit-cb' ).forEach( function ( cb ) {
+				cb.addEventListener( 'change', updateCount );
+			} );
+			applySearch();
+			updateCount();
+		}
+
+		function applySearch() {
+			var q = ( searchEl.value || '' ).trim().toLowerCase();
+			listEl.querySelectorAll( '.hi-emit-row' ).forEach( function ( row ) {
+				row.style.display = ( ! q || ( row.getAttribute( 'data-search' ) || '' ).indexOf( q ) !== -1 ) ? '' : 'none';
+			} );
+		}
+
+		function selected() {
+			var out = [];
+			listEl.querySelectorAll( '.hi-emit-row' ).forEach( function ( row ) {
+				var cb = row.querySelector( '.hi-emit-cb' );
+				if ( cb && cb.checked ) { out.push( students[ parseInt( row.getAttribute( 'data-i' ), 10 ) ] ); }
+			} );
+			return out;
+		}
+
+		function updateCount() {
+			var n = selected().length;
+			countEl.textContent = n;
+			go.disabled = n === 0;
+		}
+
+		courseSel2.addEventListener( 'change', loadStudents );
+		searchEl.addEventListener( 'input', applySearch );
+		allChk.addEventListener( 'change', function () {
+			listEl.querySelectorAll( '.hi-emit-row' ).forEach( function ( row ) {
+				if ( row.style.display === 'none' ) { return; }
+				var cb = row.querySelector( '.hi-emit-cb' );
+				if ( cb && ! cb.disabled ) { cb.checked = allChk.checked; }
+			} );
+			updateCount();
+		} );
+		reissueChk.addEventListener( 'change', render );
+
+		manualToggle.addEventListener( 'click', function () { manualForm.hidden = ! manualForm.hidden; if ( ! manualForm.hidden ) { mName.focus(); } } );
+		mAdd.addEventListener( 'click', function () {
+			var nm = mName.value.trim(); if ( ! nm ) { mName.focus(); return; }
+			students.unshift( { user_id: 0, name: nm, email: mEmail.value.trim(), has: false, manual: true } );
+			mName.value = ''; mEmail.value = '';
+			render();
+		} );
+
+		go.addEventListener( 'click', function () {
+			var sel = selected();
+			if ( ! sel.length ) { return; }
+			var rows = sel.map( function ( s ) { return { name: s.name, email: s.email || '' }; } );
+			go.disabled = true; progress.hidden = false; status.textContent = '';
+			var course = courseSel2.value, reissue = reissueChk.checked ? 1 : 0;
+			var CHUNK = 20, done = 0, tot = rows.length, agg = { ok:0, skip:0, err:0 };
+
+			function chunk( start ) {
+				var part = rows.slice( start, start + CHUNK );
+				if ( ! part.length ) { finish(); return; }
+				ajax( 'hi_emit_batch', { course_id: course, reissue: reissue, rows: JSON.stringify( part ) } ).done( function ( res ) {
+					if ( res && res.success ) { agg.ok += res.data.ok; agg.skip += res.data.skip; agg.err += res.data.err; }
+					done += part.length;
+					bar.style.width = Math.round( done / tot * 100 ) + '%';
+					progressTxt.textContent = 'Emitiendo… ' + done + ' / ' + tot;
+					chunk( start + CHUNK );
+				} ).fail( function () { progressTxt.textContent = 'Error de red.'; go.disabled = false; } );
+			}
+			function finish() {
+				progressTxt.textContent = 'Completado: ' + agg.ok + ' emitidas, ' + agg.skip + ' omitidas, ' + agg.err + ' con error.';
+				status.textContent = '✓ Listo'; status.className = 'hi-editor__status is-ok';
+				setTimeout( function () { window.location.reload(); }, 1200 );
+			}
+			chunk( 0 );
 		} );
 	}
 

@@ -105,17 +105,18 @@ $base = admin_url( 'admin.php?page=' . HI_Admin::MENU_SLUG );
 	</div>
 <?php endif; ?>
 
-<!-- Modal emitir individual -->
+<!-- Modal emitir: lista de matriculados -->
 <div class="hi-editor" id="hi-emit-modal" hidden aria-hidden="true">
 	<div class="hi-editor__backdrop" data-close></div>
-	<div class="hi-editor__panel hi-editor__panel--sm" role="dialog" aria-modal="true">
+	<div class="hi-editor__panel hi-editor__panel--md" role="dialog" aria-modal="true">
 		<header class="hi-editor__head">
 			<div>
-				<h2 class="hi-editor__title">Emitir insignia</h2>
-				<p class="hi-editor__course">Genera una insignia para un estudiante.</p>
+				<h2 class="hi-editor__title">Emitir insignias</h2>
+				<p class="hi-editor__course">Elige el curso y marca a qué estudiantes matriculados emitir.</p>
 			</div>
 			<button class="hi-editor__close" data-close aria-label="Cerrar">✕</button>
 		</header>
+
 		<div class="hi-emit-form">
 			<div class="hi-field">
 				<label>Curso</label>
@@ -124,23 +125,43 @@ $base = admin_url( 'admin.php?page=' . HI_Admin::MENU_SLUG );
 						<option value="<?php echo (int) $c['id']; ?>"><?php echo esc_html( $c['title'] ); ?></option>
 					<?php endforeach; ?>
 				</select>
-				<p class="hi-help-text">Solo aparecen cursos con plantilla activa.</p>
 			</div>
-			<div class="hi-field">
-				<label>Nombre del estudiante *</label>
-				<input type="text" id="hi-emit-name" placeholder="Ej. María Fernanda López">
+
+			<div class="hi-emit-students">
+				<div class="hi-emit-students__bar">
+					<div class="hi-search hi-search--sm">
+						<?php echo HI_Icons::get( 'dashboard', 14 ); ?>
+						<input type="text" id="hi-emit-search" placeholder="Buscar estudiante…" autocomplete="off">
+					</div>
+					<label class="hi-ctrl-check"><input type="checkbox" id="hi-emit-all"> Todos</label>
+					<label class="hi-ctrl-check" title="Volver a emitir aunque ya tengan insignia"><input type="checkbox" id="hi-emit-reissue"> Reemitir</label>
+				</div>
+
+				<div class="hi-emit-list" id="hi-emit-list">
+					<div class="hi-emit-loading">Selecciona un curso…</div>
+				</div>
+
+				<div class="hi-emit-manual">
+					<button type="button" class="hi-link" id="hi-emit-manual-toggle">+ Agregar alguien que no está en la lista</button>
+					<div class="hi-emit-manual__form" id="hi-emit-manual-form" hidden>
+						<input type="text" id="hi-emit-mname" placeholder="Nombre completo">
+						<input type="email" id="hi-emit-memail" placeholder="correo (opcional)">
+						<button type="button" class="hi-btn hi-btn--xs hi-btn--primary" id="hi-emit-madd">Añadir</button>
+					</div>
+				</div>
 			</div>
-			<div class="hi-field">
-				<label>Correo (opcional)</label>
-				<input type="email" id="hi-emit-email" placeholder="estudiante@correo.com">
-				<p class="hi-help-text">Si coincide con un usuario de WordPress, la insignia se vincula a su cuenta.</p>
+
+			<div class="hi-import__progress" id="hi-emit-progress" hidden>
+				<div class="hi-bar"><span id="hi-emit-bar" style="width:0%"></span></div>
+				<p class="hi-help-text" id="hi-emit-progress-txt">Emitiendo…</p>
 			</div>
 		</div>
+
 		<footer class="hi-editor__foot">
 			<span class="hi-editor__status" id="hi-emit-status"></span>
 			<div class="hi-editor__foot-actions">
-				<button class="hi-btn hi-btn--ghost" data-close>Cancelar</button>
-				<button class="hi-btn hi-btn--primary" id="hi-emit-go"><?php echo HI_Icons::get( 'send', 14 ); ?> Emitir</button>
+				<button class="hi-btn hi-btn--ghost" data-close>Cerrar</button>
+				<button class="hi-btn hi-btn--primary" id="hi-emit-go" disabled><?php echo HI_Icons::get( 'send', 14 ); ?> Emitir a <span id="hi-emit-count">0</span></button>
 			</div>
 		</footer>
 	</div>
