@@ -77,17 +77,21 @@ class HI_Admin {
 		if ( ! in_array( $hook, self::$screens, true ) ) {
 			return;
 		}
+		// Cache buster por filemtime: cualquier cambio en el archivo invalida el cache del browser,
+		// incluso si no bumpeamos HI_VERSION. Más robusto contra opcache / CDN / LiteSpeed.
+		$css_ver = @filemtime( HI_DIR . 'assets/admin.css' ) ?: HI_VERSION;
+		$js_ver  = @filemtime( HI_DIR . 'assets/admin.js' )  ?: HI_VERSION;
 		wp_enqueue_style(
 			'hi-admin',
 			HI_URL . 'assets/admin.css',
 			array(),
-			HI_VERSION
+			$css_ver
 		);
 		wp_enqueue_script(
 			'hi-admin',
 			HI_URL . 'assets/admin.js',
 			array( 'jquery' ),
-			HI_VERSION,
+			$js_ver,
 			true
 		);
 		wp_localize_script( 'hi-admin', 'HI_ADMIN', array(
