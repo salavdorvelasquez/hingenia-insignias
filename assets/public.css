@@ -36,12 +36,18 @@
 	transition: background .13s, border-color .13s, transform .12s;
 }
 .hp-btn:hover { transform: translateY(-1px); }
-.hp-btn-blue { background: var(--hp-blue); color: #fff; }
+.hp-btn svg { color: inherit; }
+.hp-btn-blue { background: var(--hp-blue); color: #fff !important; }
 .hp-btn-blue:hover { background: var(--hp-blue-dark); }
-.hp-btn-li { background: #0a66c2; color: #fff; }
-.hp-btn-wa { background: #fff; color: var(--hp-green); border: 1px solid #bbf7d0; }
-.hp-btn-ghost { background: #fff; color: var(--hp-ink); border-color: var(--hp-border); }
+.hp-btn-li { background: #0a66c2; color: #fff !important; }
+.hp-btn-wa { background: #fff; color: var(--hp-green) !important; border: 1px solid #bbf7d0; }
+.hp-btn-ghost { background: #fff; color: var(--hp-ink) !important; border-color: var(--hp-border); }
 .hp-btn-ghost:hover { background: var(--hp-soft); }
+.hp-btn-blue svg, .hp-btn-li svg { color: #fff !important; stroke: #fff; }
+.hp-btn-wa svg { color: var(--hp-green) !important; }
+.hp-btn-ghost svg { color: var(--hp-ink) !important; }
+/* CTA "Ver insignia" de las tarjetas del perfil */
+.hp-bcard-cta, .hp-bcard-cta svg { color: #fff !important; }
 
 /* ============ Credencial (verify) ============ */
 .hp-cred {
@@ -84,7 +90,7 @@
 .hp-mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; font-weight: 600; color: #4b5563; word-break: break-all; }
 .hp-share { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 9px; }
 .hp-cred-link { margin-top: 18px; }
-.hp-cred-link a { font-size: 14px; font-weight: 700; color: var(--hp-blue); display: inline-flex; align-items: center; gap: 6px; }
+.hp-cred-link a { font-size: 14px; font-weight: 700; color: var(--hp-blue) !important; display: inline-flex; align-items: center; gap: 6px; }
 .hp-cred-link a:hover { text-decoration: underline; }
 
 /* ============ Detalle inferior ============ */
