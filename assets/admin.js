@@ -402,9 +402,226 @@
 		}
 	}
 
+	/* ============================================================
+	   Emisiones: filtros + emitir individual + revocar
+	   ============================================================ */
+	function initEmisiones() {
+		var search = document.getElementById( 'hi-em-search' );
+		var courseSel = document.getElementById( 'hi-em-course' );
+		var table  = document.getElementById( 'hi-em-table' );
+		var nores  = document.getElementById( 'hi-em-noresults' );
+
+		if ( table ) {
+			function apply() {
+				var q = ( search.value || '' ).trim().toLowerCase();
+				var cf = courseSel.value;
+				var shown = 0;
+				table.querySelectorAll( 'tbody tr' ).forEach( function ( tr ) {
+					var okText = ! q || ( tr.getAttribute( 'data-search' ) || '' ).indexOf( q ) !== -1;
+					var okCourse = ! cf || tr.getAttribute( 'data-course' ) === cf;
+					var show = okText && okCourse;
+					tr.style.display = show ? '' : 'none';
+					if ( show ) { shown++; }
+				} );
+				if ( nores ) { nores.hidden = shown !== 0; }
+			}
+			search.addEventListener( 'input', apply );
+			courseSel.addEventListener( 'change', apply );
+
+			table.querySelectorAll( '.hi-em-revoke' ).forEach( function ( btn ) {
+				btn.addEventListener( 'click', function () {
+					if ( ! window.confirm( '¿Revocar esta insignia? Se eliminará su imagen y dejará de ser válida.' ) ) { return; }
+					ajax( 'hi_revoke_cert', { id: btn.getAttribute( 'data-id' ) } ).done( function () {
+						var tr = btn.closest( 'tr' );
+						if ( tr ) { tr.parentNode.removeChild( tr ); }
+					} );
+				} );
+			} );
+		}
+
+		// Modal emitir individual
+		var modal = document.getElementById( 'hi-emit-modal' );
+		if ( ! modal ) { return; }
+		var openBtn = document.getElementById( 'hi-emit-open' );
+		var go      = document.getElementById( 'hi-emit-go' );
+		var status  = document.getElementById( 'hi-emit-status' );
+
+		function open() { modal.hidden = false; document.body.classList.add( 'hi-modal-open' ); document.getElementById( 'hi-emit-name' ).focus(); }
+		function close() { modal.hidden = true; document.body.classList.remove( 'hi-modal-open' ); status.textContent = ''; }
+
+		if ( openBtn ) { openBtn.addEventListener( 'click', open ); }
+		modal.querySelectorAll( '[data-close]' ).forEach( function ( b ) { b.addEventListener( 'click', close ); } );
+
+		go.addEventListener( 'click', function () {
+			var course = document.getElementById( 'hi-emit-course' ).value;
+			var name   = document.getElementById( 'hi-emit-name' ).value.trim();
+			var email  = document.getElementById( 'hi-emit-email' ).value.trim();
+			if ( ! name ) { status.textContent = 'Escribe el nombre.'; status.className = 'hi-editor__status is-error'; return; }
+			go.disabled = true; status.textContent = 'Emitiendo…'; status.className = 'hi-editor__status';
+			ajax( 'hi_emit_single', { course_id: course, name: name, email: email } ).done( function ( res ) {
+				if ( res && res.success ) {
+					status.textContent = 'Emitida ✓'; status.className = 'hi-editor__status is-ok';
+					setTimeout( function () { window.location.reload(); }, 700 );
+				} else {
+					status.textContent = ( res && res.data && res.data.msg ) || 'Error.'; status.className = 'hi-editor__status is-error';
+					go.disabled = false;
+				}
+			} ).fail( function () { status.textContent = 'Error de red.'; status.className = 'hi-editor__status is-error'; go.disabled = false; } );
+		} );
+	}
+
+	/* ============================================================
+	   Importar CSV
+	   ============================================================ */
+	function parseCSV( text ) {
+		var rows = [], row = [], field = '', i = 0, inQ = false, c;
+		text = text.replace( /\r\n/g, '\n' ).replace( /\r/g, '\n' );
+		for ( ; i < text.length; i++ ) {
+			c = text[ i ];
+			if ( inQ ) {
+				if ( c === '"' ) {
+					if ( text[ i + 1 ] === '"' ) { field += '"'; i++; }
+					else { inQ = false; }
+				} else { field += c; }
+			} else {
+				if ( c === '"' ) { inQ = true; }
+				else if ( c === ',' || c === ';' || c === '\t' ) { row.push( field ); field = ''; }
+				else if ( c === '\n' ) { row.push( field ); rows.push( row ); row = []; field = ''; }
+				else { field += c; }
+			}
+		}
+		if ( field !== '' || row.length ) { row.push( field ); rows.push( row ); }
+		return rows.filter( function ( r ) { return r.some( function ( x ) { return ( x || '' ).trim() !== ''; } ); } );
+	}
+
+	function initImportar() {
+		var courseSel = document.getElementById( 'hi-imp-course' );
+		if ( ! courseSel ) { return; }
+		var fileInput = document.getElementById( 'hi-imp-file' );
+		var browse    = document.getElementById( 'hi-imp-browse' );
+		var drop      = document.getElementById( 'hi-imp-drop' );
+		var paste     = document.getElementById( 'hi-imp-paste' );
+		var previewBtn = document.getElementById( 'hi-imp-preview' );
+		var headerChk = document.getElementById( 'hi-imp-header' );
+		var reissueChk = document.getElementById( 'hi-imp-reissue' );
+		var step3     = document.getElementById( 'hi-imp-step3' );
+		var tbody     = document.getElementById( 'hi-imp-tbody' );
+		var countPill = document.getElementById( 'hi-imp-count' );
+		var emitBtn   = document.getElementById( 'hi-imp-emit' );
+		var progress  = document.getElementById( 'hi-imp-progress' );
+		var bar       = document.getElementById( 'hi-imp-bar' );
+		var progressTxt = document.getElementById( 'hi-imp-progress-txt' );
+		var summary   = document.getElementById( 'hi-imp-summary' );
+		var parsed    = [];
+
+		function readFile( file ) {
+			var fr = new FileReader();
+			fr.onload = function () { paste.value = fr.result; buildPreview(); };
+			fr.readAsText( file, 'UTF-8' );
+		}
+
+		browse.addEventListener( 'click', function () { fileInput.click(); } );
+		fileInput.addEventListener( 'change', function () { if ( fileInput.files[0] ) { readFile( fileInput.files[0] ); } } );
+		[ 'dragenter', 'dragover' ].forEach( function ( ev ) {
+			drop.addEventListener( ev, function ( e ) { e.preventDefault(); drop.classList.add( 'is-over' ); } );
+		} );
+		[ 'dragleave', 'drop' ].forEach( function ( ev ) {
+			drop.addEventListener( ev, function ( e ) { e.preventDefault(); drop.classList.remove( 'is-over' ); } );
+		} );
+		drop.addEventListener( 'drop', function ( e ) {
+			if ( e.dataTransfer.files[0] ) { readFile( e.dataTransfer.files[0] ); }
+		} );
+		previewBtn.addEventListener( 'click', buildPreview );
+
+		function looksEmail( s ) { return /@/.test( s || '' ); }
+
+		function buildPreview() {
+			var rows = parseCSV( paste.value || '' );
+			if ( headerChk.checked && rows.length ) { rows = rows.slice( 1 ); }
+			parsed = rows.map( function ( r ) {
+				var name = ( r[0] || '' ).trim();
+				var email = ( r[1] || '' ).trim();
+				// si la primera columna es un email y no hay segunda, ajusta
+				if ( ! email && looksEmail( name ) ) { email = name; name = ''; }
+				return { name: name, email: email };
+			} ).filter( function ( x ) { return x.name || x.email; } );
+
+			tbody.innerHTML = '';
+			parsed.forEach( function ( p, idx ) {
+				var tr = document.createElement( 'tr' );
+				tr.innerHTML = '<td class="hi-muted">' + ( idx + 1 ) + '</td>'
+					+ '<td>' + escapeHtml( p.name || '—' ) + '</td>'
+					+ '<td class="hi-muted">' + escapeHtml( p.email || '—' ) + '</td>'
+					+ '<td id="hi-imp-st-' + idx + '"><span class="hi-muted">pendiente</span></td>';
+				tbody.appendChild( tr );
+			} );
+			countPill.textContent = parsed.length + ' filas';
+			step3.hidden = parsed.length === 0;
+			summary.hidden = true;
+			progress.hidden = true;
+			bar.style.width = '0%';
+			emitBtn.disabled = parsed.length === 0;
+			if ( parsed.length === 0 ) { window.alert( 'No se encontraron filas válidas.' ); }
+		}
+
+		function escapeHtml( s ) {
+			return ( s || '' ).replace( /[&<>"']/g, function ( m ) {
+				return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ m ];
+			} );
+		}
+
+		emitBtn.addEventListener( 'click', function () {
+			if ( ! parsed.length ) { return; }
+			emitBtn.disabled = true;
+			progress.hidden = false;
+			summary.hidden = true;
+			var course = courseSel.value;
+			var reissue = reissueChk.checked ? 1 : 0;
+			var CHUNK = 20, done = 0, tot = parsed.length;
+			var agg = { ok: 0, skip: 0, err: 0 };
+
+			function sendChunk( start ) {
+				var chunk = parsed.slice( start, start + CHUNK );
+				if ( ! chunk.length ) { finish(); return; }
+				ajax( 'hi_emit_batch', { course_id: course, reissue: reissue, rows: JSON.stringify( chunk ) } ).done( function ( res ) {
+					if ( res && res.success ) {
+						agg.ok += res.data.ok; agg.skip += res.data.skip; agg.err += res.data.err;
+						( res.data.items || [] ).forEach( function ( it, i ) {
+							var cell = document.getElementById( 'hi-imp-st-' + ( start + i ) );
+							if ( cell ) {
+								if ( it.status === 'ok' ) { cell.innerHTML = '<span class="hi-tag hi-tag--ok">emitida</span>'; }
+								else if ( it.status === 'skip' ) { cell.innerHTML = '<span class="hi-tag hi-tag--skip">ya tenía</span>'; }
+								else { cell.innerHTML = '<span class="hi-tag hi-tag--err" title="' + escapeHtml( it.msg || '' ) + '">error</span>'; }
+							}
+						} );
+					}
+					done += chunk.length;
+					var pct = Math.round( done / tot * 100 );
+					bar.style.width = pct + '%';
+					progressTxt.textContent = 'Emitiendo… ' + done + ' / ' + tot;
+					sendChunk( start + CHUNK );
+				} ).fail( function () {
+					progressTxt.textContent = 'Error de red durante la emisión.';
+					emitBtn.disabled = false;
+				} );
+			}
+			function finish() {
+				progressTxt.textContent = 'Completado.';
+				summary.hidden = false;
+				summary.innerHTML = '<span class="hi-tag hi-tag--ok">' + agg.ok + ' emitidas</span> '
+					+ '<span class="hi-tag hi-tag--skip">' + agg.skip + ' omitidas</span> '
+					+ '<span class="hi-tag hi-tag--err">' + agg.err + ' con error</span> '
+					+ '<a href="' + ( A.base ? A.base + '-emisiones' : '#' ) + '" class="hi-link">Ver emisiones →</a>';
+			}
+			sendChunk( 0 );
+		} );
+	}
+
 	$( function () {
 		initFilter();
 		initEditor();
+		initEmisiones();
+		initImportar();
 	} );
 
 } )( jQuery );

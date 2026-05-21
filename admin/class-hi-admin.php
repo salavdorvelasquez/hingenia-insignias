@@ -35,6 +35,9 @@ class HI_Admin {
 		// AJAX (admin).
 		add_action( 'wp_ajax_hi_save_template',   array( $this, 'ajax_save_template' ) );
 		add_action( 'wp_ajax_hi_delete_template', array( $this, 'ajax_delete_template' ) );
+		add_action( 'wp_ajax_hi_emit_single',     array( $this, 'ajax_emit_single' ) );
+		add_action( 'wp_ajax_hi_emit_batch',      array( $this, 'ajax_emit_batch' ) );
+		add_action( 'wp_ajax_hi_revoke_cert',     array( $this, 'ajax_revoke_cert' ) );
 	}
 
 	public function add_menu() {
@@ -254,6 +257,60 @@ class HI_Admin {
 			HI_Data::delete_template( $id );
 		}
 		wp_send_json_success( array( 'msg' => 'Plantilla eliminada.' ) );
+	}
+
+	/** Emite una insignia individual. */
+	public function ajax_emit_single() {
+		$this->check_ajax();
+		$course_id = isset( $_POST['course_id'] ) ? (int) $_POST['course_id'] : 0;
+		$name      = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$email     = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$reissue   = ! empty( $_POST['reissue'] );
+
+		$res = HI_Emit::issue( $course_id, $name, $email, 0, $reissue );
+		if ( empty( $res['success'] ) ) {
+			wp_send_json_error( array( 'msg' => $res['error'] ?? 'Error.' ) );
+		}
+		wp_send_json_success( $res );
+	}
+
+	/** Emite un lote (importación CSV). Recibe filas JSON: [{name,email}]. */
+	public function ajax_emit_batch() {
+		$this->check_ajax();
+		$course_id = isset( $_POST['course_id'] ) ? (int) $_POST['course_id'] : 0;
+		$reissue   = ! empty( $_POST['reissue'] );
+		$rows_raw  = isset( $_POST['rows'] ) ? wp_unslash( $_POST['rows'] ) : '[]';
+		$rows      = json_decode( $rows_raw, true );
+		if ( ! is_array( $rows ) ) {
+			wp_send_json_error( array( 'msg' => 'Datos inválidos.' ) );
+		}
+
+		$out = array( 'ok' => 0, 'skip' => 0, 'err' => 0, 'items' => array() );
+		foreach ( $rows as $r ) {
+			$name  = isset( $r['name'] ) ? sanitize_text_field( $r['name'] ) : '';
+			$email = isset( $r['email'] ) ? sanitize_email( $r['email'] ) : '';
+			$res   = HI_Emit::issue( $course_id, $name, $email, 0, $reissue );
+			if ( empty( $res['success'] ) ) {
+				$out['err']++;
+				$out['items'][] = array( 'name' => $name, 'status' => 'err', 'msg' => $res['error'] ?? 'error' );
+			} elseif ( ! empty( $res['skipped'] ) ) {
+				$out['skip']++;
+				$out['items'][] = array( 'name' => $name, 'status' => 'skip' );
+			} else {
+				$out['ok']++;
+				$out['items'][] = array( 'name' => $name, 'status' => 'ok', 'url' => $res['url'] );
+			}
+		}
+		wp_send_json_success( $out );
+	}
+
+	public function ajax_revoke_cert() {
+		$this->check_ajax();
+		$id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0;
+		if ( $id ) {
+			HI_Emit::revoke( $id );
+		}
+		wp_send_json_success( array( 'msg' => 'Insignia revocada.' ) );
 	}
 
 	/** Normaliza el layout recibido del editor a tipos/rangos seguros. */
