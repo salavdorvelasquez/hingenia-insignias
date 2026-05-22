@@ -58,6 +58,11 @@ class HI_Emit {
 				'msg'     => 'Ya tenía insignia (omitido).',
 			);
 		}
+		// Reemisión: revoca TODAS las insignias previas de este alumno en este
+		// curso (incluye duplicados antiguos) para que la nueva las sobrescriba.
+		if ( $existing && $reissue ) {
+			self::revoke_existing( $course_id, $user_id, $email );
+		}
 
 		$cert = HI_Data::insert_certificate( array(
 			'user_id'      => $user_id,
@@ -89,6 +94,30 @@ class HI_Emit {
 			'url'     => $gen['url'],
 			'verify'  => $verify,
 		);
+	}
+
+	/**
+	 * Revoca (y borra el PNG de) TODAS las insignias vigentes de un alumno en un
+	 * curso. Se usa al reemitir, para que no queden duplicados.
+	 */
+	private static function revoke_existing( $course_id, $user_id, $email ) {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			'SELECT id, token FROM ' . HI_Data::table_certificates() . '
+			  WHERE course_id = %d AND revoked_at IS NULL
+			    AND ( ( %d > 0 AND user_id = %d ) OR ( %s <> "" AND user_email = %s ) )',
+			(int) $course_id,
+			(int) $user_id,
+			(int) $user_id,
+			(string) $email,
+			(string) $email
+		) );
+		foreach ( (array) $rows as $r ) {
+			if ( ! empty( $r->token ) ) {
+				HI_Generator::delete_png( $r->token );
+			}
+			HI_Data::revoke_certificate( (int) $r->id );
+		}
 	}
 
 	/** Revoca una emisión y borra su PNG. */

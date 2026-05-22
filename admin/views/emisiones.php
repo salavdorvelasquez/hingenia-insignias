@@ -40,7 +40,7 @@ $base = admin_url( 'admin.php?page=' . HI_Admin::MENU_SLUG );
 		<?php echo HI_Icons::get( 'dashboard', 15 ); ?>
 		<input type="text" id="hi-em-search" placeholder="Buscar por nombre o correo…" autocomplete="off">
 	</div>
-	<select id="hi-em-course" class="hi-select">
+	<select id="hi-em-course" class="hi-select hi-csearch">
 		<option value="">Todos los cursos</option>
 		<?php foreach ( $courses as $c ) : ?>
 			<option value="<?php echo (int) $c['id']; ?>"><?php echo esc_html( $c['title'] ); ?></option>
@@ -120,7 +120,7 @@ $base = admin_url( 'admin.php?page=' . HI_Admin::MENU_SLUG );
 		<div class="hi-emit-form">
 			<div class="hi-field">
 				<label>Curso</label>
-				<select id="hi-emit-course">
+				<select id="hi-emit-course" class="hi-csearch">
 					<?php foreach ( $with_tpl as $c ) : ?>
 						<option value="<?php echo (int) $c['id']; ?>"><?php echo esc_html( $c['title'] ); ?></option>
 					<?php endforeach; ?>

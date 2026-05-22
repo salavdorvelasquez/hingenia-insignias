@@ -36,7 +36,7 @@ $base = admin_url( 'admin.php?page=' . HI_Admin::MENU_SLUG );
 		<div class="hi-import__num">1</div>
 		<div class="hi-import__body">
 			<h2 class="hi-card__title">Elige el curso</h2>
-			<select id="hi-imp-course" class="hi-select">
+			<select id="hi-imp-course" class="hi-select hi-csearch">
 				<?php foreach ( $with_tpl as $c ) : ?>
 					<option value="<?php echo (int) $c['id']; ?>"><?php echo esc_html( $c['title'] ); ?></option>
 				<?php endforeach; ?>
