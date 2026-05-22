@@ -34,8 +34,12 @@ class HI_Public {
 
 	private function __construct() {
 		add_action( 'init', array( __CLASS__, 'register_rewrite_rules' ) );
+		add_action( 'init', array( __CLASS__, 'maybe_flush_rewrite' ), 11 );
 		add_filter( 'query_vars', array( __CLASS__, 'register_query_vars' ) );
 		add_action( 'template_redirect', array( $this, 'maybe_render' ) );
+		// Búsqueda pública por correo (página /insignias).
+		add_action( 'wp_ajax_hi_search_badges', array( $this, 'ajax_search' ) );
+		add_action( 'wp_ajax_nopriv_hi_search_badges', array( $this, 'ajax_search' ) );
 	}
 
 	public static function register_rewrite_rules() {
@@ -43,26 +47,42 @@ class HI_Public {
 		$public_slug = trim( $s['public_slug'], '/' );
 		$badge_slug  = trim( $s['badge_slug'], '/' );
 
+		// Base /insignias → buscador. Debe ir antes que la regla con segmento.
+		add_rewrite_rule( '^' . preg_quote( $public_slug, '/' ) . '/?$', 'index.php?hi_search=1', 'top' );
 		add_rewrite_rule( '^' . preg_quote( $public_slug, '/' ) . '/([^/]+)/?$', 'index.php?hi_profile=$matches[1]', 'top' );
 		add_rewrite_rule( '^' . preg_quote( $badge_slug, '/' ) . '/([^/]+)/?$', 'index.php?hi_badge=$matches[1]', 'top' );
+	}
+
+	/** Flush una sola vez por versión (al actualizar el plugin se añaden reglas nuevas). */
+	public static function maybe_flush_rewrite() {
+		if ( get_option( 'hi_rewrite_v' ) !== HI_VERSION ) {
+			self::register_rewrite_rules();
+			flush_rewrite_rules();
+			update_option( 'hi_rewrite_v', HI_VERSION );
+		}
 	}
 
 	public static function register_query_vars( $vars ) {
 		$vars[] = 'hi_profile';
 		$vars[] = 'hi_badge';
+		$vars[] = 'hi_search';
 		return $vars;
 	}
 
 	public function maybe_render() {
 		$badge   = get_query_var( 'hi_badge' );
 		$profile = get_query_var( 'hi_profile' );
-		if ( ! $badge && ! $profile ) {
+		$search  = get_query_var( 'hi_search' );
+		if ( ! $badge && ! $profile && ! $search ) {
 			return;
 		}
 
 		$s = HI_Data::get_settings();
 
-		if ( $badge ) {
+		if ( $search ) {
+			$this->mode  = 'search';
+			$this->title = 'Verifica una insignia';
+		} elseif ( $badge ) {
 			$this->cert = HI_Data::get_certificate_by_token( $badge );
 			if ( $this->cert ) {
 				$this->mode  = 'badge';
@@ -150,6 +170,10 @@ class HI_Public {
 	   Render del cuerpo (dentro del header/footer del tema)
 	   ================================================================ */
 	public function render_body() {
+		if ( 'search' === $this->mode ) {
+			$this->render_search();
+			return;
+		}
 		echo '<div class="hp-wrap">';
 		if ( 'badge' === $this->mode ) {
 			$this->render_badge();
@@ -159,6 +183,136 @@ class HI_Public {
 			$this->render_notfound();
 		}
 		echo '</div>';
+	}
+
+	/* ================================================================
+	   Búsqueda pública por correo (página /insignias)
+	   ================================================================ */
+	public function ajax_search() {
+		$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		if ( ! $email || ! is_email( $email ) ) {
+			wp_send_json_error( array( 'msg' => 'Correo inválido.' ) );
+		}
+		$certs = HI_Data::get_certificates_for_email( $email );
+		if ( empty( $certs ) ) {
+			wp_send_json_success( array( 'found' => false ) );
+		}
+		$user    = get_user_by( 'email', $email );
+		$name    = ( $user && $user->display_name ) ? $user->display_name : $certs[0]->user_name;
+		$profile = ( $user ) ? HI_Data::profile_url( (int) $user->ID ) : '';
+		$badges  = array();
+		foreach ( $certs as $c ) {
+			$badges[] = array(
+				'title' => $c->course_title,
+				'date'  => date_i18n( 'd M Y', strtotime( $c->emitido_at ) ),
+				'url'   => HI_Data::badge_url( $c->token ),
+				'png'   => $c->png_url,
+			);
+		}
+		wp_send_json_success( array(
+			'found'   => true,
+			'name'    => $name,
+			'count'   => count( $certs ),
+			'profile' => $profile,
+			'badges'  => $badges,
+		) );
+	}
+
+	private function render_search() {
+		$s   = HI_Data::get_settings();
+		$org = $s['org_name'];
+		$atc = ! empty( $s['atc_enabled'] ) && '' !== $s['atc_partner'];
+		?>
+		<main class="hp-srch">
+			<section class="hp-srch-hero">
+				<div class="hp-wrap">
+					<span class="hp-srch-shield"><?php echo HI_Icons::get( 'check', 28 ); ?></span>
+					<?php if ( $atc ) : ?><div class="hp-srch-eyebrow"><?php echo esc_html( __( 'Insignias digitales · ', 'hingenia-insignias' ) . $s['atc_partner'] . ' ' . $s['atc_label'] ); ?></div><?php endif; ?>
+					<h1 class="hp-srch-h1"><?php esc_html_e( 'Verifica una', 'hingenia-insignias' ); ?> <span class="hp-srch-accent"><?php esc_html_e( 'insignia', 'hingenia-insignias' ); ?></span> <?php echo esc_html( $org ); ?>.</h1>
+					<p class="hp-srch-sub"><?php esc_html_e( 'Credenciales digitales verificables que acreditan competencias reales — busca por el correo del titular para ver todas sus insignias.', 'hingenia-insignias' ); ?></p>
+
+					<div class="hp-finder">
+						<form id="hi-finder" autocomplete="off">
+							<div class="hp-finder-field">
+								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 7 9-7"/></svg>
+								<input id="hi-finder-email" type="email" placeholder="<?php esc_attr_e( 'Ingresa el correo electrónico del titular…', 'hingenia-insignias' ); ?>">
+							</div>
+							<button type="submit"><?php esc_html_e( 'Buscar insignias', 'hingenia-insignias' ); ?></button>
+						</form>
+						<div class="hp-finder-hint"><?php esc_html_e( 'Busca todas las credenciales verificadas asociadas a una persona.', 'hingenia-insignias' ); ?></div>
+					</div>
+
+					<div class="hp-srch-trust">
+						<span><?php echo HI_Icons::get( 'check', 15 ); ?> <?php esc_html_e( '100% verificables', 'hingenia-insignias' ); ?></span>
+						<span><?php echo HI_Icons::get( 'check', 15 ); ?> <?php esc_html_e( 'Reconocimiento internacional', 'hingenia-insignias' ); ?></span>
+						<?php if ( $atc ) : ?><span><?php echo HI_Icons::get( 'check', 15 ); ?> <?php printf( esc_html__( 'Respaldo %s', 'hingenia-insignias' ), esc_html( $s['atc_partner'] ) ); ?></span><?php endif; ?>
+					</div>
+
+					<div class="hp-srch-result" id="hi-result" aria-live="polite"></div>
+				</div>
+			</section>
+
+			<section class="hp-srch-block">
+				<div class="hp-wrap">
+					<div class="hp-sec-head">
+						<div class="hp-eyebrow"><?php esc_html_e( 'Verifica en segundos', 'hingenia-insignias' ); ?></div>
+						<h2><?php esc_html_e( '3 pasos para validar una insignia.', 'hingenia-insignias' ); ?></h2>
+					</div>
+					<div class="hp-srch-cards">
+						<div class="hp-srch-card"><span class="hp-srch-step">1</span><h3><?php esc_html_e( 'Ingresa el correo', 'hingenia-insignias' ); ?></h3><p><?php esc_html_e( 'Escribe el correo del titular en el buscador para encontrar todas sus credenciales.', 'hingenia-insignias' ); ?></p></div>
+						<div class="hp-srch-card"><span class="hp-srch-step">2</span><h3><?php esc_html_e( 'Revisa la credencial', 'hingenia-insignias' ); ?></h3><p><?php esc_html_e( 'Verás sus insignias verificadas con el nombre del programa, fecha de emisión e ID único.', 'hingenia-insignias' ); ?></p></div>
+						<div class="hp-srch-card"><span class="hp-srch-step">3</span><h3><?php esc_html_e( 'Valida con el QR o ID', 'hingenia-insignias' ); ?></h3><p><?php esc_html_e( 'Escanea el código QR o usa el ID de credencial para confirmar su autenticidad oficial.', 'hingenia-insignias' ); ?></p></div>
+					</div>
+				</div>
+			</section>
+
+			<?php if ( $atc && '' !== $s['atc_note'] ) : ?>
+				<section class="hp-srch-block hp-srch-block--tight">
+					<div class="hp-wrap">
+						<div class="hp-atc-band">
+							<span class="hp-seal"><?php echo HI_Icons::get( 'award', 26 ); ?></span>
+							<div><div class="hp-at-name"><?php echo esc_html( $s['atc_partner'] ); ?></div><div class="hp-at-sub"><?php echo esc_html( $s['atc_label'] ); ?></div></div>
+							<p><?php echo esc_html( $s['atc_note'] ); ?></p>
+						</div>
+					</div>
+				</section>
+			<?php endif; ?>
+		</main>
+
+		<script>
+		(function(){
+			var AJAX = "<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>";
+			var form = document.getElementById('hi-finder');
+			var input = document.getElementById('hi-finder-email');
+			var out = document.getElementById('hi-result');
+			function esc(s){ return (s||'').replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+			function render(d){
+				if (!d.found){
+					out.innerHTML = '<div class="hp-srch-notfound"><b><?php echo esc_js( __( 'Sin resultados', 'hingenia-insignias' ) ); ?></b><p><?php echo esc_js( __( 'No encontramos insignias asociadas a ese correo. Verifica el correo o pídelo al titular.', 'hingenia-insignias' ) ); ?></p></div>';
+					return;
+				}
+				var badges = d.badges.map(function(b){
+					var img = b.png ? '<img src="'+esc(b.png)+'" alt="">' : '';
+					return '<a class="hp-rb" href="'+esc(b.url)+'"><div class="hp-rb-cover"><span class="hp-rb-v">✓</span>'+img+'</div><div class="hp-rb-body"><b>'+esc(b.title)+'</b><span><?php echo esc_js( __( 'Emitida el', 'hingenia-insignias' ) ); ?> '+esc(b.date)+'</span></div></a>';
+				}).join('');
+				var foot = d.profile ? '<div class="hp-rc-foot"><a href="'+esc(d.profile)+'"><?php echo esc_js( __( 'Ver perfil completo', 'hingenia-insignias' ) ); ?> →</a></div>' : '';
+				var plural = d.count>1 ? 's':'';
+				out.innerHTML = '<div class="hp-rc"><div class="hp-rc-head"><span class="hp-rc-av">'+esc(d.name.charAt(0).toUpperCase())+'</span><div><h3>'+esc(d.name)+'</h3><span class="hp-rc-vfy">'+d.count+' <?php echo esc_js( __( 'insignia', 'hingenia-insignias' ) ); ?>'+plural+' <?php echo esc_js( __( 'verificada', 'hingenia-insignias' ) ); ?>'+plural+'</span></div></div><div class="hp-rc-grid">'+badges+'</div>'+foot+'</div>';
+			}
+			form.addEventListener('submit', function(e){
+				e.preventDefault();
+				var em = (input.value||'').trim();
+				if(!em){ input.focus(); return; }
+				out.innerHTML = '<div class="hp-srch-loading"><?php echo esc_js( __( 'Buscando…', 'hingenia-insignias' ) ); ?></div>';
+				var body = 'action=hi_search_badges&email='+encodeURIComponent(em);
+				fetch(AJAX,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+					.then(function(r){return r.json();})
+					.then(function(j){ if(j&&j.success){ render(j.data); } else { render({found:false}); } })
+					.catch(function(){ out.innerHTML='<div class="hp-srch-notfound"><b><?php echo esc_js( __( 'Error', 'hingenia-insignias' ) ); ?></b><p><?php echo esc_js( __( 'No se pudo completar la búsqueda. Intenta de nuevo.', 'hingenia-insignias' ) ); ?></p></div>'; });
+			});
+		})();
+		</script>
+		<?php
 	}
 
 	private function render_badge() {
