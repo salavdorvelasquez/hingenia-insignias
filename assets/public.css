@@ -254,3 +254,54 @@
 	.hp-student { flex-direction: column; }
 	.hp-badges, .hp-about { grid-template-columns: 1fr; }
 }
+
+/* ============================= MODO OSCURO ============================= */
+/* El tema aplica html.dark (mismo base #080809 que el resto del sitio). Casi
+   todo se resuelve redefiniendo las variables de .hp-main; abajo solo los
+   colores/gradientes que estaban hardcodeados. */
+html.dark .hp-main {
+	--hp-ink: #f3f4f6;
+	--hp-muted: #9aa1ac;
+	--hp-border: rgba(255, 255, 255, 0.08);
+	--hp-bg: #121214;
+	--hp-soft: #1a1a1e;
+	--hp-blue: #60a5fa;
+	--hp-blue-dark: #3b82f6;
+	--hp-blue-soft: rgba(96, 165, 250, 0.14);
+	--hp-green: #34d399;
+	--hp-green-soft: rgba(52, 211, 153, 0.16);
+	background:
+		radial-gradient(1200px 520px at 50% -180px, #101018 0%, transparent 70%),
+		#080809;
+}
+/* Paneles que traen su propio gradiente claro → superficie oscura */
+html.dark .hp-cred-badge,
+html.dark .hp-bcard-cover { background: linear-gradient(170deg, #161618, #0e0e10); border-color: var(--hp-border); }
+html.dark .hp-rb-cover { background: radial-gradient(circle at 50% 30%, #17171b, #101012 70%); }
+/* Texto secundario hardcodeado (#374151 / #4b5563) */
+html.dark .hp-cred-subtitle,
+html.dark .hp-card p,
+html.dark .hp-crit-item,
+html.dark .hp-desc,
+html.dark .hp-bdesc { color: #cbd5e1; }
+html.dark .hp-mono { color: #9aa1ac; }
+/* Botones azules sólidos: mantener el azul fuerte de marca */
+html.dark .hp-btn-blue,
+html.dark .hp-finder button,
+html.dark .hp-bcard-cta { background: #2563eb; color: #fff !important; }
+html.dark .hp-btn-blue:hover,
+html.dark .hp-finder button:hover,
+html.dark .hp-bcard:hover .hp-bcard-cta { background: #1d4ed8; }
+html.dark .hp-btn-ghost { background: rgba(255, 255, 255, 0.04); border-color: var(--hp-border); }
+html.dark .hp-btn-ghost:hover { background: rgba(255, 255, 255, 0.08); }
+/* Hover de tarjetas */
+html.dark .hp-bcard:hover { border-color: rgba(255, 255, 255, 0.18); box-shadow: 0 30px 54px -28px rgba(0, 0, 0, 0.6); }
+/* Chip negro de "Autodesk ATC" en la franja → un punto más claro para separar del fondo */
+html.dark .hp-ic--k { background: #2a2a30; }
+/* Lightbox del QR */
+html.dark .hp-lightbox__box { background: #15151b; }
+html.dark .hp-lightbox__box p { color: #9aa1ac; }
+html.dark .hp-lightbox__x { background: rgba(255, 255, 255, 0.06); border-color: var(--hp-border); color: #cbd5e1; }
+html.dark .hp-lightbox__x:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+/* Iconos de estado vacío */
+html.dark .hp-empty svg, html.dark .hp-notfound__ico { color: #3b4b6b; }

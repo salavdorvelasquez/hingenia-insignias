@@ -3,7 +3,7 @@
  * Plugin Name: Hingenia Insignias Digitales
  * Plugin URI: https://hingenia.com
  * Description: Sistema de insignias digitales (badges) por curso de Tutor LMS. Sube una insignia base por curso, emite manualmente o por importación CSV, cada insignia lleva un QR único de verificación y un perfil público por estudiante con todas sus insignias.
- * Version: 0.9.1
+ * Version: 0.9.2
  * Author: Hingenia
  * Text Domain: hingenia-insignias
  * Requires at least: 6.0
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HI_VERSION',  '0.9.1' );
+define( 'HI_VERSION',  '0.9.2' );
 define( 'HI_DIR',      plugin_dir_path( __FILE__ ) );
 define( 'HI_URL',      plugin_dir_url( __FILE__ ) );
 define( 'HI_BASENAME', plugin_basename( __FILE__ ) );
