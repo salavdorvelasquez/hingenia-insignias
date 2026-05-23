@@ -24,6 +24,7 @@ class HI_Public {
 	private $user  = null;
 	private $title = '';
 	private $og    = array();
+	private $mine  = false;   // true cuando es la página "Mis insignias" del usuario logueado
 
 	public static function get_instance() {
 		if ( null === self::$instance ) {
@@ -97,6 +98,16 @@ class HI_Public {
 				$this->mode  = '404';
 				$this->title = 'Insignia no encontrada';
 			}
+		} elseif ( in_array( strtolower( trim( (string) $profile ) ), array( 'mis-insignias', 'mis-insignia' ), true ) ) {
+			// Palabra reservada → "Mis insignias" del usuario logueado.
+			if ( ! is_user_logged_in() ) {
+				wp_safe_redirect( home_url( '/login?redirect_to=' . rawurlencode( HI_Data::mine_url() ) ) );
+				exit;
+			}
+			$this->user  = wp_get_current_user();
+			$this->mine  = true;
+			$this->mode  = 'profile';
+			$this->title = __( 'Mis insignias', 'hingenia-insignias' );
 		} else {
 			$user = null;
 			if ( ctype_digit( (string) $profile ) ) {
@@ -138,6 +149,11 @@ class HI_Public {
 		add_filter( 'document_title_parts', array( $this, 'filter_title_parts' ), 99 );
 		add_action( 'wp_head', array( $this, 'print_og' ), 5 );
 		add_filter( 'template_include', array( $this, 'load_template' ), 99 );
+
+		// La página personal "Mis insignias" no debe indexarse.
+		if ( $this->mine ) {
+			add_action( 'wp_head', function () { echo '<meta name="robots" content="noindex,nofollow">' . "\n"; }, 1 );
+		}
 	}
 
 	public function filter_title() {
@@ -482,12 +498,25 @@ class HI_Public {
 		</div>
 
 		<div class="hp-sec-head">
-			<div class="hp-eyebrow">Credenciales</div>
-			<h2>Insignias obtenidas</h2>
+			<div class="hp-eyebrow"><?php echo $this->mine ? 'Mis credenciales' : 'Credenciales'; ?></div>
+			<h2><?php echo $this->mine ? 'Mis insignias obtenidas' : 'Insignias obtenidas'; ?></h2>
 		</div>
 
 		<?php if ( empty( $certs ) ) : ?>
-			<div class="hp-empty"><?php echo HI_Icons::get( 'award', 40 ); ?><p>Este estudiante aún no tiene insignias.</p></div>
+			<?php if ( $this->mine ) : ?>
+				<div class="hp-empty hp-empty--mine">
+					<?php echo HI_Icons::get( 'award', 40 ); ?>
+					<h3>Aún no tienes insignias</h3>
+					<p>Las insignias digitales de <?php echo esc_html( $s['org_name'] ); ?> son credenciales verificables que acreditan las competencias que demuestras al completar tus cursos. Cada una lleva un ID único y un código QR: son 100% verificables y puedes compartirlas en LinkedIn, en tu CV o por WhatsApp.</p>
+					<p class="hp-empty-hint">Cuando completes un curso con insignia habilitada, tu insignia aparecerá aquí automáticamente.</p>
+					<div class="hp-empty-cta">
+						<a class="hp-btn hp-btn-blue" href="<?php echo esc_url( home_url( '/cursos' ) ); ?>">Ver cursos</a>
+						<a class="hp-btn hp-btn-ghost" href="<?php echo esc_url( HI_Data::search_url() ); ?>">Verificar una insignia</a>
+					</div>
+				</div>
+			<?php else : ?>
+				<div class="hp-empty"><?php echo HI_Icons::get( 'award', 40 ); ?><p>Este estudiante aún no tiene insignias.</p></div>
+			<?php endif; ?>
 		<?php else : ?>
 			<div class="hp-badges">
 				<?php foreach ( $certs as $c ) :

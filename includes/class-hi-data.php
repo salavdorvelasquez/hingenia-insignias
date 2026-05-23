@@ -504,4 +504,16 @@ class HI_Data {
 		$s = self::get_settings();
 		return home_url( '/' . trim( $s['public_slug'], '/' ) . '/' . rawurlencode( $user_id_or_slug ) . '/' );
 	}
+
+	/** URL de la página "Mis insignias" del usuario logueado (palabra reservada). */
+	public static function mine_url() {
+		$s = self::get_settings();
+		return home_url( '/' . trim( $s['public_slug'], '/' ) . '/mis-insignias/' );
+	}
+
+	/** URL del buscador público de insignias (base /insignias). */
+	public static function search_url() {
+		$s = self::get_settings();
+		return home_url( '/' . trim( $s['public_slug'], '/' ) . '/' );
+	}
 }

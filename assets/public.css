@@ -173,6 +173,12 @@
 .hp-empty svg, .hp-notfound__ico { color: #c7d2fe; margin-bottom: 12px; }
 .hp-notfound h1 { font-size: 22px; color: var(--hp-ink); margin: 8px 0 6px; }
 .hp-notfound p, .hp-empty p { margin: 0; font-size: 14px; }
+/* Estado vacío de "Mis insignias" (usuario logueado sin credenciales) */
+.hp-empty--mine { padding: 48px 28px; }
+.hp-empty--mine h3 { font-size: 20px; font-weight: 800; color: var(--hp-ink); margin: 10px 0 10px; }
+.hp-empty--mine p { max-width: 560px; margin: 0 auto; line-height: 1.65; }
+.hp-empty--mine .hp-empty-hint { margin-top: 10px; font-size: 13px; opacity: .85; }
+.hp-empty-cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
 
 /* ============ Lightbox QR ============ */
 .hp-lightbox { position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; }
